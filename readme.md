@@ -19,35 +19,12 @@ A multiplayer gaming platform built with React, Node.js, Socket.IO and MongoDB.
 
 **Database** — MongoDB Atlas
 
-**Infrastructure** — Docker, Nginx
-
 ---
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js 20+
-- Docker & Docker Compose (for containerised setup)
-
----
-
-### Run with Docker (recommended)
-
-```bash
-# Clone the repo
-git clone https://github.com/Akhil-1802/PlayVerse.git
-cd PlayVerse
-
-# Add your environment variables
-cp backend/.env.example backend/.env
-# Fill in MONGODB_URI in backend/.env
-
-# Start everything
-docker compose up --build
-```
-
-- Frontend → http://localhost
-- Backend → http://localhost:3000
 
 ---
 
@@ -91,18 +68,14 @@ PlayVerse/
 │   │   ├── models/
 │   │   ├── routes/
 │   │   └── utils/
-│   ├── server.js
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── utils/
-│   ├── Dockerfile
-│   └── nginx.conf
-└── docker-compose.yml
+│   └── server.js
+└── frontend/
+    └── src/
+        ├── components/
+        ├── hooks/
+        ├── pages/
+        ├── services/
+        └── utils/
 ```
 
 ---
