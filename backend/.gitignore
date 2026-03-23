@@ -1,10 +1,6 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
-dist-ssr/
-
 # Environment variables
 .env
 .env.*
@@ -17,10 +13,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
-
-# Local dev
-*.local
 
 # OS
 .DS_Store
@@ -36,5 +28,11 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Vite cache
-.vite/
+# Runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
