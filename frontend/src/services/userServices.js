@@ -8,6 +8,5 @@ export const createRoom = async(roomData) =>{
 
 export const joinRoom = async(roomData) =>{
     const response = await apiClient.post('/api/room/join', roomData);
-
     return response.data;
 }

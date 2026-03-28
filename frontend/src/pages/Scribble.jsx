@@ -21,7 +21,7 @@ export default function Scribble() {
     try {
       const data = await createroom(createForm);
       setCreateForm({ name: "", rounds: "3" });
-      navigate("/room/" + data.room_id)
+      navigate("/room/" + data.room_id ,{state : {name : createForm.name}})
     } catch {
       // error is handled by the hook and shown via `error` state
     }
@@ -39,7 +39,7 @@ export default function Scribble() {
     }
     try {
       await joinroom({...joinForm,room_id:joinForm.roomId});
-      navigate("/room/" + joinForm.roomId)  
+      navigate("/room/" + joinForm.roomId,{state : {name : joinForm.name}})  
       setJoinForm({ name: "", roomId: "" });
     } catch {
       // handle join error
