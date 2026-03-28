@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { socket } from "../utils/socket"
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import Canvas from '../components/Canvas'
 
 function Room() {
   const { room_id } = useParams()
-  const name = localStorage.getItem('name') || 'Anonymous'
-
+  const location = useLocation()
   const [players, setPlayers] = useState([])
   const [chat, setchats] = useState([])
   const [words, setWords] = useState([])
@@ -28,7 +27,7 @@ function Room() {
   const [canvas, setCanvas] = useState(false)
 
   useEffect(() => {
-    socket.emit("join_room", { name: name || 'Anonymous', room_id })
+    socket.emit("join_room", { name: location.state.name || 'Anonymous', room_id })
     socket.on("game_start",({round})=>  setRound(round))
     socket.on("get_players", (playersList) => setPlayers(playersList))
     socket.on("game_message", (data) => setchats(data.messages))
