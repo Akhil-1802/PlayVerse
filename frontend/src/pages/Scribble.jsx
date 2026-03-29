@@ -10,7 +10,7 @@ export default function Scribble() {
   const [joinForm, setJoinForm] = useState({ name: "", roomId: "" });
   const [validationError, setValidationError] = useState("");
 
-  const { loading, error, createroom ,joinroom} = useRoom();
+  const { loading, error, createroom, joinroom } = useRoom();
 
   const handleCreateRoom = async () => {
     setValidationError("");
@@ -21,7 +21,7 @@ export default function Scribble() {
     try {
       const data = await createroom(createForm);
       setCreateForm({ name: "", rounds: "3" });
-      navigate("/room/" + data.room_id ,{state : {name : createForm.name}})
+      navigate("/room/" + data.room_id, { state: { name: createForm.name } });
     } catch {
       // error is handled by the hook and shown via `error` state
     }
@@ -38,8 +38,8 @@ export default function Scribble() {
       return;
     }
     try {
-      await joinroom({...joinForm,room_id:joinForm.roomId});
-      navigate("/room/" + joinForm.roomId,{state : {name : joinForm.name}})  
+      await joinroom({ ...joinForm, room_id: joinForm.roomId });
+      navigate("/room/" + joinForm.roomId, { state: { name: joinForm.name } });
       setJoinForm({ name: "", roomId: "" });
     } catch {
       // handle join error
@@ -57,38 +57,38 @@ export default function Scribble() {
     <div className="min-h-screen bg-[#0d0d0f] text-white flex flex-col">
 
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-5 border-b border-white/10">
-        <a href="/" className="text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+      <nav className="flex items-center justify-between px-5 md:px-10 py-4 md:py-5 border-b border-white/10">
+        <a href="/" className="text-xl md:text-2xl font-black tracking-widest bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
           PLAYVERSE
         </a>
-        <div className="flex gap-6 text-sm text-white/50 font-medium">
+        <div className="flex gap-4 md:gap-6 text-sm text-white/50 font-medium">
           <a href="/" className="hover:text-white transition">Games</a>
           <a href="#" className="hover:text-white transition">About</a>
         </div>
       </nav>
 
       {/* Game Hero */}
-      <header className="flex flex-col items-center text-center pt-14 pb-10 px-4">
-        <span className="text-xs font-semibold tracking-widest uppercase text-white/30 border border-white/10 px-3 py-1 rounded-full mb-5">
+      <header className="flex flex-col items-center text-center pt-10 md:pt-14 pb-8 md:pb-10 px-4">
+        <span className="text-xs font-semibold tracking-widest uppercase text-white/30 border border-white/10 px-3 py-1 rounded-full mb-4 md:mb-5">
           Multiplayer
         </span>
-        <div className="text-6xl mb-4">🎨</div>
-        <h1 className="text-5xl md:text-7xl font-black tracking-tight bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+        <div className="text-5xl md:text-6xl mb-3 md:mb-4">🎨</div>
+        <h1 className="text-4xl md:text-7xl font-black tracking-tight bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
           Scribble
         </h1>
-        <p className="mt-4 text-white/40 text-base max-w-sm leading-relaxed">
+        <p className="mt-3 md:mt-4 text-white/40 text-sm md:text-base max-w-sm leading-relaxed">
           Draw a word, let your friends guess it. The faster they guess, the more points you earn. Real-time chaos guaranteed.
         </p>
       </header>
 
       {/* Tab Switcher */}
-      <div className="flex justify-center mb-8 px-4">
-        <div className="flex bg-white/5 border border-white/10 rounded-2xl p-1 gap-1">
+      <div className="flex justify-center mb-6 md:mb-8 px-4">
+        <div className="flex bg-white/5 border border-white/10 rounded-2xl p-1 gap-1 w-full max-w-xs">
           {["create", "join"].map((tab) => (
             <button
               key={tab}
               onClick={() => handleTabSwitch(tab)}
-              className={`px-8 py-2.5 rounded-xl text-sm font-bold tracking-wide capitalize transition-all duration-200
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold tracking-wide capitalize transition-all duration-200
                 ${activeTab === tab
                   ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30"
                   : "text-white/40 hover:text-white"
@@ -101,9 +101,9 @@ export default function Scribble() {
       </div>
 
       {/* Form Card */}
-      <main className="flex justify-center px-4 pb-20">
+      <main className="flex justify-center px-4 pb-16 md:pb-20">
         <div className="w-full max-w-md rounded-3xl p-[1.5px] bg-gradient-to-br from-purple-500 to-pink-500 shadow-2xl shadow-purple-500/20">
-          <div className="rounded-3xl bg-[#111114] p-8 flex flex-col gap-6">
+          <div className="rounded-3xl bg-[#111114] p-6 md:p-8 flex flex-col gap-5 md:gap-6">
 
             {/* Error Banner */}
             {displayError && (
