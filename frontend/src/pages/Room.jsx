@@ -137,7 +137,7 @@ function Room() {
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 text-xs text-white/40 font-semibold tracking-wide shrink-0">
-          <span className="hidden sm:inline">ROOM <span className="text-white/70">{room_id}</span></span>
+          <span className=" sm:inline">ROOM <span className="text-white/70">{room_id}</span></span>
           <span>R<span className="text-white/70">{round}</span></span>
           {endTime != null && (
             <span className={`${time <= 10 ? 'text-red-400' : 'text-white/70'} font-black`}>{time}s</span>
