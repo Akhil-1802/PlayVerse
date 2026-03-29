@@ -246,7 +246,11 @@ io.on('connection',async(socket)=>{
     //connection for start_game purpose
     socket.on("start_game",async(room_id) =>{
         
-        
+        const Findroom = await Room.findOne({room_id}).select("players");
+        if(Findroom.players.length == 1){
+            io.to(room_id).emit("game_not_started",{error :"Atleast need 2 players"});
+            return;
+        }
         socket.to(room_id).emit("game_start",{round:1})
         await Room.updateOne(
   { room_id },

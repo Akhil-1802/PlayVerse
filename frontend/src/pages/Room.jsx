@@ -18,6 +18,7 @@ function Room() {
   const [drawer, setDrawer] = useState(null)
   const [drawerID, setDrawerID] = useState(null)
   const [alreadyGuessed, setAlreadyGuessed] = useState('')
+  const [gameNotStarted, setGameNotStarted] = useState('')
   const [gameEnd, setGameEnd] = useState(false)
   const [endTime, setEndTime] = useState(null)
   const [wordToGuess, setWordToGuess] = useState("")
@@ -36,6 +37,13 @@ function Room() {
     socket.on("already_guessed", (msg) => {
       setAlreadyGuessed(msg)
       setTimeout(() => setAlreadyGuessed(''), 3000)
+    })
+    socket.on("game_not_started", ({ error }) => {
+      setGameNotStarted(error)
+      setTimeout(() => {setGameNotStarted('')
+        setStarted(false);
+      setRound(0)}
+      , 3000)
     })
     socket.on("round_end", () => {
       setEndTime(null)
@@ -98,6 +106,13 @@ function Room() {
       {alreadyGuessed && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-yellow-400/10 border border-yellow-400/30 text-yellow-300 font-semibold px-6 py-3 rounded-xl shadow-lg backdrop-blur-sm">
           {alreadyGuessed}
+        </div>
+      )}
+
+      {/* Game Not Started Toast */}
+      {gameNotStarted && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-red-500/10 border border-red-500/30 text-red-400 font-semibold px-6 py-3 rounded-xl shadow-lg backdrop-blur-sm flex items-center gap-2">
+          <span>⚠</span> {gameNotStarted}
         </div>
       )}
 
