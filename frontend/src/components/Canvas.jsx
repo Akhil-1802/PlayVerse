@@ -33,6 +33,7 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     return () => window.removeEventListener('resize', updateSize)
   }, [])
 
+  // Draw using absolute canvas pixel coords
   function drawLine(x1, y1, x2, y2, ctx, color, tool, eraserSize) {
     ctx.beginPath()
     if (tool === "eraser") {
@@ -48,16 +49,22 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     ctx.stroke()
   }
 
-  // Scale pointer coords relative to canvas logical size
-  function getScaledCoords(e, canvas) {
+  // Returns normalized coords (0–1) relative to canvas size
+  function getNormalizedCoords(e, canvas) {
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
     const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
     const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: (clientX - rect.left) / rect.width,
+      y: (clientY - rect.top) / rect.height,
+    }
+  }
+
+  // Converts normalized coords back to canvas pixel coords
+  function toPixels(nx, ny, canvas) {
+    return {
+      x: nx * canvas.width,
+      y: ny * canvas.height,
     }
   }
 
@@ -71,14 +78,17 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     const startDrawing = (e) => {
       e.preventDefault()
       isDrawingRef.current = true
-      const { x, y } = getScaledCoords(e, canvas)
+      const { x, y } = getNormalizedCoords(e, canvas)
       prevX = x; prevY = y
     }
     const draw = (e) => {
       e.preventDefault()
       if (!isDrawingRef.current || gameState !== "drawing") return
-      const { x, y } = getScaledCoords(e, canvas)
-      drawLine(prevX, prevY, x, y, ctx, color, tool, eraserSize)
+      const { x, y } = getNormalizedCoords(e, canvas)
+      const p1 = toPixels(prevX, prevY, canvas)
+      const p2 = toPixels(x, y, canvas)
+      drawLine(p1.x, p1.y, p2.x, p2.y, ctx, color, tool, eraserSize)
+      // emit normalized coords so all screen sizes render correctly
       socket.emit("draw", { room_id, prevX, prevY, x, y, color, tool, eraserSize })
       prevX = x; prevY = y
     }
@@ -102,7 +112,10 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
     socket.on("draw", ({ prevX, prevY, x, y, color, tool, eraserSize }) => {
-      drawLine(prevX, prevY, x, y, ctx, color, tool, eraserSize)
+      // denormalize incoming coords to this canvas's pixel size
+      const p1 = toPixels(prevX, prevY, canvas)
+      const p2 = toPixels(x, y, canvas)
+      drawLine(p1.x, p1.y, p2.x, p2.y, ctx, color, tool, eraserSize)
     })
     return () => { socket.off("draw") }
   }, [isDrawer, color, tool])
