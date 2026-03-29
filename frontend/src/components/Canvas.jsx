@@ -3,9 +3,11 @@ import { socket } from '../utils/socket'
 
 function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord }) {
   const canvasRef = useRef(null)
+  const containerRef = useRef(null)
   const [color, setColor] = useState("#ffffff")
   const [tool, setTool] = useState("pen")
   const [eraserSize, setEraserSize] = useState(10)
+  const [canvasSize, setCanvasSize] = useState({ width: 780, height: 420 })
 
   const colors = [
     { value: "#ffffff", label: "White" },
@@ -17,6 +19,19 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     { value: "#fb923c", label: "Orange" },
     { value: "#000000", label: "Black" },
   ]
+
+  // Resize canvas to fit container
+  useEffect(() => {
+    const updateSize = () => {
+      if (!containerRef.current) return
+      const w = containerRef.current.offsetWidth
+      const h = Math.round(w * (420 / 780))
+      setCanvasSize({ width: w, height: h })
+    }
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    return () => window.removeEventListener('resize', updateSize)
+  }, [])
 
   function drawLine(x1, y1, x2, y2, ctx, color, tool, eraserSize) {
     ctx.beginPath()
@@ -33,6 +48,19 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     ctx.stroke()
   }
 
+  // Scale pointer coords relative to canvas logical size
+  function getScaledCoords(e, canvas) {
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    }
+  }
+
   useEffect(() => {
     if (!isDrawer) return
     const canvas = canvasRef.current
@@ -41,32 +69,33 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
     const isDrawingRef = { current: false }
 
     const startDrawing = (e) => {
+      e.preventDefault()
       isDrawingRef.current = true
-      prevX = e.offsetX
-      prevY = e.offsetY
+      const { x, y } = getScaledCoords(e, canvas)
+      prevX = x; prevY = y
     }
     const draw = (e) => {
+      e.preventDefault()
       if (!isDrawingRef.current || gameState !== "drawing") return
-      const x = e.offsetX, y = e.offsetY
+      const { x, y } = getScaledCoords(e, canvas)
       drawLine(prevX, prevY, x, y, ctx, color, tool, eraserSize)
       socket.emit("draw", { room_id, prevX, prevY, x, y, color, tool, eraserSize })
-      prevX = x
-      prevY = y
+      prevX = x; prevY = y
     }
-    const stopDrawing = () => { isDrawingRef.current = false }
+    const stopDrawing = (e) => { e.preventDefault(); isDrawingRef.current = false }
 
-    canvas.addEventListener("mousedown", startDrawing)
-    canvas.addEventListener("mousemove", draw)
-    canvas.addEventListener("mouseup", stopDrawing)
-    canvas.addEventListener("mouseleave", stopDrawing)
+    canvas.addEventListener("pointerdown", startDrawing)
+    canvas.addEventListener("pointermove", draw)
+    canvas.addEventListener("pointerup", stopDrawing)
+    canvas.addEventListener("pointerleave", stopDrawing)
 
     return () => {
-      canvas.removeEventListener("mousedown", startDrawing)
-      canvas.removeEventListener("mousemove", draw)
-      canvas.removeEventListener("mouseup", stopDrawing)
-      canvas.removeEventListener("mouseleave", stopDrawing)
+      canvas.removeEventListener("pointerdown", startDrawing)
+      canvas.removeEventListener("pointermove", draw)
+      canvas.removeEventListener("pointerup", stopDrawing)
+      canvas.removeEventListener("pointerleave", stopDrawing)
     }
-  }, [isDrawer, gameState, color, tool, eraserSize])
+  }, [isDrawer, gameState, color, tool, eraserSize, canvasSize])
 
   useEffect(() => {
     if (isDrawer) return
@@ -81,23 +110,21 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
-    socket.on("clear_canvas", () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-    })
+    socket.on("clear_canvas", () => ctx.clearRect(0, 0, canvas.width, canvas.height))
     return () => { socket.off("clear_canvas") }
   }, [])
 
   return (
-    <div className="flex-1 flex flex-col items-center gap-3">
+    <div className="flex-1 flex flex-col items-center gap-2 md:gap-3 min-w-0">
 
       {/* Word choice buttons */}
       {words.length > 0 && (
-        <div className="flex gap-3">
+        <div className="flex gap-2 md:gap-3 flex-wrap justify-center">
           {words.map((w, index) => (
             <button
               key={index}
               onClick={() => { socket.emit("word_chosen", { room_id, word: w, socket_id: socket.id }); setWords([]) }}
-              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 shadow-lg shadow-purple-500/30 transition-all duration-200 hover:-translate-y-0.5"
+              className="px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 shadow-lg shadow-purple-500/30 transition-all duration-200 hover:-translate-y-0.5"
             >
               {w}
             </button>
@@ -107,9 +134,9 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
 
       {/* Toolbar — only for drawer */}
       {isDrawer && (
-        <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 bg-white/5 border border-white/10 rounded-2xl px-3 md:px-4 py-2 md:py-2.5 w-full justify-center">
           {/* Color swatches */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 md:gap-1.5 flex-wrap justify-center">
             {colors.map((c) => (
               <button
                 key={c.value}
@@ -122,9 +149,8 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
             ))}
           </div>
 
-          <div className="w-px h-5 bg-white/10" />
+          <div className="w-px h-5 bg-white/10 hidden sm:block" />
 
-          {/* Eraser */}
           <button
             onClick={() => setTool("eraser")}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all
@@ -136,22 +162,20 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
             Eraser
           </button>
 
-          {/* Eraser size */}
           {tool === "eraser" && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/30">Size</span>
               <input
                 type="range" min={5} max={50} value={eraserSize}
                 onChange={(e) => setEraserSize(Number(e.target.value))}
-                className="w-20 accent-purple-500"
+                className="w-16 md:w-20 accent-purple-500"
               />
               <span className="text-xs text-white/40">{eraserSize}px</span>
             </div>
           )}
 
-          <div className="w-px h-5 bg-white/10" />
+          <div className="w-px h-5 bg-white/10 hidden sm:block" />
 
-          {/* Clear */}
           <button
             onClick={() => {
               const canvas = canvasRef.current
@@ -167,19 +191,20 @@ function Canvas({ words, setWords, room_id, isDrawer, gameState, choosingWord })
       )}
 
       {/* Canvas */}
-      <div className="relative rounded-2xl p-[1.5px] bg-gradient-to-br from-purple-500/30 to-pink-500/30">
+      <div ref={containerRef} className="relative rounded-2xl p-[1.5px] bg-gradient-to-br from-purple-500/30 to-pink-500/30 w-full">
         {choosingWord && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0d0d0f]/80 rounded-2xl z-10 backdrop-blur-sm">
-            <p className="text-white/60 font-bold text-sm animate-pulse tracking-widest uppercase">
+            <p className="text-white/60 font-bold text-xs md:text-sm animate-pulse tracking-widest uppercase text-center px-4">
               ✏ Drawer is choosing a word...
             </p>
           </div>
         )}
         <canvas
           ref={canvasRef}
-          height={420}
-          width={780}
-          className="rounded-2xl bg-[#1a1a1f] block"
+          width={canvasSize.width}
+          height={canvasSize.height}
+          className="rounded-2xl bg-[#1a1a1f] block w-full"
+          style={{ touchAction: 'none' }}
         />
       </div>
 
