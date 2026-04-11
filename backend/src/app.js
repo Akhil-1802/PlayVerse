@@ -12,7 +12,19 @@ const typingRoundRoomRouter = require('./routes/typingRoundRoom.route');
 const TypingRoundRoom = require('./models/typingRoundRoom.model');
 const { getTypingText, getRoundText, getRoundTimer } = require('./utils/typingTexts');
 
+const getSharedRoundText = async (room_id, round) => {
+  const room = await TypingRoundRoom.findOne({ room_id });
+  if (!room) return getRoundText(round);
 
+  const key = String(round);
+  let text = room.roundTextsMap?.get(key);
+  if (!text) {
+    text = getRoundText(round);
+    await TypingRoundRoom.updateOne({ room_id }, { $set: { [`roundTextsMap.${key}`]: text } });
+  }
+
+  return text;
+};
 
 const app = express();
 app.use(express.json());
@@ -30,9 +42,7 @@ const io = new Server(server,{
 //for room timers
 const roomtimers = {};
 io.on('connection',async(socket)=>{
-    console.log(socket.id);
     socket.on("join_room", async ({ name, room_id }) => {
-        console.log(name, room_id);
     //Making a player join a room using socket.io
     socket.join(room_id);
 
@@ -67,7 +77,6 @@ io.on('connection',async(socket)=>{
     }
     //Get players in the room and emit it to all the clients in the room
     const players = await Room.findOne({ room_id })
-    console.log(players)
     if(players && players.players.length > 0){
         const creatorID = players.players[0].socketId;
         io.to(creatorID).emit("creator", true);
@@ -77,12 +86,9 @@ io.on('connection',async(socket)=>{
 });
     //Socket connection for getting the messages and checking the word
     socket.on('send_message',async({name , message,room_id})=>{
-        console.log(name,room_id,message)
         const room = await Room.findOne({room_id}); //CHeck the room
-        console.log(room)
         if(room.word.toLowerCase() === message.toLowerCase()){ //if the word is correct then update the score of the player and add the player to the guessed players array
             if(room.guessed_players.includes(name)){ //if player already guessed the word then return
-                console.log("Player already guessed the word");
                 io.to(socket.id).emit("already_guessed", "You have already guessed the word");
                 return;
             };
@@ -120,7 +126,6 @@ io.on('connection',async(socket)=>{
             if(updatedRoom.guessed_players.length === updatedRoom.players.length -1 ){ //if all players except the drawer guessed the word then end the game
                 endRound(room_id);
             }
-            console.log(updatedRoom)
             io.to(room_id).emit('correct_guess', {players :updatedRoom.players,guessed_players : updatedRoom.guessed_players});
         }
         
@@ -139,7 +144,6 @@ io.on('connection',async(socket)=>{
             
         //send the messages to the all clients
         const messages = await Message.findOne({room_id}).select('messages');
-        console.log(messages)
         io.to(room_id).emit('game_message',messages)
     })
 
@@ -171,8 +175,6 @@ io.on('connection',async(socket)=>{
                 return;
             }
             const player = index.players[0];
-            console.log("turn_end_console")
-            console.log(player,index);
             await Room.updateOne({room_id},{
                 currentDrawerIndex : 0,
                 drawer : player.socketId,
@@ -182,17 +184,13 @@ io.on('connection',async(socket)=>{
             io.to(room_id).emit("new_round",index.round + 1);
         }
         let words = pickRandom(index.words,3); //get 3 random words from the room's words array for the next turn
-        console.log("next_turn_console")
-        console.log(words)
         const room = await Room.findOne({room_id});
-        console.log(room)
         const player = room.players[room.currentDrawerIndex];
         await Room.updateOne({room_id},{
             guessed_players : [],
             drawer : player.socketId,
             currentDrawerIndex : room.currentDrawerIndex + 1
         })
-        console.log(player)
         io.to(player.socketId).emit("choose_word",words);
         const updatedRoom = await Room.findOne({room_id}); 
         io.to(updatedRoom.drawer).emit("drawer", {drawer : true,drawerId : updatedRoom.drawer}); //send the new drawer information to all clients in the room
@@ -209,7 +207,6 @@ io.on('connection',async(socket)=>{
         const room = await Room.findOne({room_id}).select("players guessed_players drawer"); //get the room information
         if(room.guessed_players.length > 0){ //if there are players who guessed the word then update the score of the drawer based on the number of players who guessed the word
             let drawerScore = 0;
-            console.log("drawerscore",room.drawer)
             if(room.guessed_players.length === 1) drawerScore = 50;
             else if(room.guessed_players.length === 2) drawerScore = 75;
             else if(room.guessed_players.length >= 3) drawerScore = 100;
@@ -280,8 +277,6 @@ io.on('connection',async(socket)=>{
         io.to(room_id).emit("get_players", room.players); //emit the updated players information to all clients in the room
         let words = pickRandom(room.words,3); //get 3 random words from the room's words array
         const player = room.players[room.currentDrawerIndex]; //get the current drawer information
-        console.log("start_game_console")
-        console.log(player)
         await Room.updateOne({room_id},{
             currentDrawerIndex : room.currentDrawerIndex + 1,
             drawer : player.socketId
@@ -334,7 +329,6 @@ io.on('connection',async(socket)=>{
     socket.on("draw", async ({ room_id, prevX, prevY, x, y ,color,tool,eraserSize}) => {
 
   // only drawer allowed
-  console.log("Draw Event", socket.id, room_id, prevX, prevY, x, y);
   const room = await Room.findOne({ room_id });
 
   if (socket.id !== room.drawer) return;
@@ -346,7 +340,6 @@ io.on('connection',async(socket)=>{
 
 });
     socket.on("leave_room", async ({room_id}) => {
-        console.log("Leave Room", socket.id);
   await Room.updateOne(
     { room_id },
     {
@@ -511,8 +504,7 @@ io.on('connection',async(socket)=>{
             const updated = await TypingRoundRoom.findOne({ room_id });
             const roundDuration = getRoundTimer(1) * 1000;
             const endsAt = Date.now() + roundDuration;
-            // same text for all players in round 1
-            const sharedText = getRoundText(1);
+            const sharedText = await getSharedRoundText(room_id, 1);
             for (const p of updated.players) {
                 io.to(p.socketId).emit('tround_new_round', { round: 1, text: sharedText, endsAt, duration: getRoundTimer(1) });
             }
@@ -550,7 +542,7 @@ io.on('connection',async(socket)=>{
         }
 
         // advance player to next round with same shared text
-        const sharedText = getRoundText(nextRound);
+        const sharedText = await getSharedRoundText(room_id, nextRound);
         await TypingRoundRoom.updateOne(
             { room_id, 'players.socketId': socket.id },
             { $set: { 'players.$.currentRound': nextRound } }
@@ -607,6 +599,7 @@ io.on('connection',async(socket)=>{
             'players.$[].currentRound': 0,
             'players.$[].finished': false,
             'players.$[].eliminated': false,
+            roundTextsMap: {},
         });
         const updated = await TypingRoundRoom.findOne({ room_id });
         io.to(room_id).emit('tround_players', updated.players);

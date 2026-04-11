@@ -29,45 +29,52 @@ export default function TypingRoom() {
   useEffect(() => {
     socket.emit("typing_join", { room_id, name });
 
-    socket.on("typing_players", (p) => setPlayers(p));
-    socket.on("typing_creator", () => setIsCreator(true));
-    socket.on("typing_error", ({ message }) => setError(message));
-    socket.on("typing_countdown", ({ count }) => {
-      setPhase("countdown");
-      setCountdown(count);
-    });
-    socket.on("typing_start_game", ({ text, endsAt }) => {
+    const onPlayers = (p) => setPlayers(p);
+    const onCreator = () => setIsCreator(true);
+    const onError = ({ message }) => setError(message);
+    const onCountdown = ({ count }) => { setPhase("countdown"); setCountdown(count); };
+    const onStartGame = ({ text, endsAt }) => {
       setText(text);
       setEndsAt(endsAt);
+      typedRef.current = "";
       setTyped("");
       setMyProgress(0);
       setOpponentCharIndex(-1);
       setPhase("playing");
       setCountdown(null);
       setTimeout(() => inputRef.current?.focus(), 100);
-    });
-    socket.on("typing_opponent_progress", ({ charIndex }) => {
-      setOpponentCharIndex(charIndex);
-    });
-    socket.on("typing_game_over", ({ players, winner }) => {
+    };
+    const onOpponentProgress = ({ charIndex }) => setOpponentCharIndex(charIndex);
+    const onGameOver = ({ players, winner }) => {
       setResult({ players, winner });
       setPhase("finished");
       clearInterval(timerRef.current);
-    });
-    socket.on("typing_opponent_left", () => setOpponentLeft(true));
+    };
+    const onOpponentLeft = () => setOpponentLeft(true);
+
+    socket.on("typing_players", onPlayers);
+    socket.on("typing_creator", onCreator);
+    socket.on("typing_error", onError);
+    socket.on("typing_countdown", onCountdown);
+    socket.on("typing_start_game", onStartGame);
+    socket.on("typing_opponent_progress", onOpponentProgress);
+    socket.on("typing_game_over", onGameOver);
+    socket.on("typing_opponent_left", onOpponentLeft);
 
     return () => {
       socket.emit("typing_leave", { room_id });
-      socket.off("typing_players");
-      socket.off("typing_creator");
-      socket.off("typing_error");
-      socket.off("typing_countdown");
-      socket.off("typing_start_game");
-      socket.off("typing_opponent_progress");
-      socket.off("typing_game_over");
-      socket.off("typing_opponent_left");
+      socket.off("typing_players", onPlayers);
+      socket.off("typing_creator", onCreator);
+      socket.off("typing_error", onError);
+      socket.off("typing_countdown", onCountdown);
+      socket.off("typing_start_game", onStartGame);
+      socket.off("typing_opponent_progress", onOpponentProgress);
+      socket.off("typing_game_over", onGameOver);
+      socket.off("typing_opponent_left", onOpponentLeft);
     };
   }, [room_id]);
+
+  const typedRef = useRef("");
 
   // ── Countdown timer ───────────────────────────────────────────
   useEffect(() => {
@@ -83,11 +90,11 @@ export default function TypingRoom() {
   const handleTyping = useCallback((e) => {
     if (phase !== "playing") return;
     const value = e.target.value;
+    const currentTyped = typedRef.current;
 
-    // only allow advancing if the new character matches
-    if (value.length > typed.length) {
+    if (value.length > currentTyped.length) {
       const newChar = value[value.length - 1];
-      const expectedChar = text[typed.length];
+      const expectedChar = text[currentTyped.length];
       if (newChar !== expectedChar) {
         setWrongKey(true);
         setTimeout(() => setWrongKey(false), 400);
@@ -95,13 +102,13 @@ export default function TypingRoom() {
       }
     }
     setWrongKey(false);
-
+    typedRef.current = value;
     setTyped(value);
     const charIndex = value.length;
     const progress = Math.min(100, Math.round((charIndex / text.length) * 100));
     setMyProgress(progress);
     socket.emit("typing_progress", { room_id, charIndex, progress });
-  }, [phase, text, typed, room_id]);
+  }, [phase, text, room_id]);
 
   // Render text with my typed chars coloured + opponent cursor inline
   const renderText = () => {

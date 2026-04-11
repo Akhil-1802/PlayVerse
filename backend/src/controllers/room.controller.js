@@ -8,7 +8,6 @@ const shuffleWords = shuffle(words);
 const createRoom = async(req , res) =>{
     try {
         const {name,rounds} = req.body;
-        console.log(name,rounds)
         if(!name) return res.status(400).json({
             message : "Name is required"
         })
@@ -34,7 +33,6 @@ const createRoom = async(req , res) =>{
             room_id
         })
     } catch (error) {
-        console.log(error);
         res.status(500).json({
             message: "Internal Server Error"
         });
@@ -64,7 +62,6 @@ const joinRoom = async(req , res) =>{
             message : "Joined the room successfully"
         })
     } catch (error) {
-        console.log(error);
         res.status(500).json({
             message: "Internal Server Error"
         });
