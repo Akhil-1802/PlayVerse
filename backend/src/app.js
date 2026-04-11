@@ -3,16 +3,20 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const roomRouter = require('./routes/room.route');
+const typingRoomRouter = require('./routes/typingRoom.route');
 const Room = require('./models/room.model');
 const Message = require('./models/message.model');
+const TypingRoom = require('./models/typingRoom.model');
 const { pickRandom } = require('./utils/helperfunction');
+const { getTypingText } = require('./utils/typingTexts');
 
 
 
 const app = express();
 app.use(express.json());
 app.use(cors());
-app.use('/api/room',roomRouter);
+app.use('/api/room', roomRouter);
+app.use('/api/typing', typingRoomRouter);
 
 const server = http.createServer(app);
 const io = new Server(server,{
@@ -346,10 +350,118 @@ io.on('connection',async(socket)=>{
       $pull: { players: { socketId: socket.id } }
     }
   )
-
-})
 })
 
+    // ─── Typing Game ───────────────────────────────────────────────
 
+    socket.on('typing_join', async ({ room_id, name }) => {
+        const room = await TypingRoom.findOne({ room_id });
+        if (!room) return;
+
+        socket.join(room_id);
+
+        const exists = room.players.find(p => p.name === name);
+        if (exists) {
+            await TypingRoom.updateOne(
+                { room_id, 'players.name': name },
+                { $set: { 'players.$.socketId': socket.id } }
+            );
+        } else {
+            if (room.players.length >= 2) {
+                socket.emit('typing_error', { message: 'Room is full' });
+                return;
+            }
+            await TypingRoom.updateOne(
+                { room_id },
+                { $push: { players: { name, socketId: socket.id, progress: 0, finished: false } } }
+            );
+        }
+
+        const updated = await TypingRoom.findOne({ room_id });
+        io.to(room_id).emit('typing_players', updated.players);
+
+        // first player is creator
+        if (updated.players[0]?.socketId === socket.id) {
+            socket.emit('typing_creator', true);
+        }
+    });
+
+    socket.on('typing_start', async ({ room_id }) => {
+        const room = await TypingRoom.findOne({ room_id });
+        if (!room) return;
+        if (room.players.length < 2) {
+            socket.emit('typing_error', { message: 'Need 2 players to start' });
+            return;
+        }
+        if (room.players[0]?.socketId !== socket.id) return;
+
+        const text = getTypingText(room.duration);
+        await TypingRoom.updateOne({ room_id }, { status: 'countdown', text });
+
+        // 3-2-1 countdown then start
+        io.to(room_id).emit('typing_countdown', { count: 3 });
+        setTimeout(() => io.to(room_id).emit('typing_countdown', { count: 2 }), 1000);
+        setTimeout(() => io.to(room_id).emit('typing_countdown', { count: 1 }), 2000);
+        setTimeout(async () => {
+            const duration = room.duration * 1000;
+            const endsAt = Date.now() + duration;
+            await TypingRoom.updateOne({ room_id }, { status: 'playing' });
+            io.to(room_id).emit('typing_start_game', { text, endsAt });
+
+            // auto-end when timer runs out
+            setTimeout(async () => {
+                const r = await TypingRoom.findOne({ room_id });
+                if (!r || r.status !== 'playing') return;
+                await TypingRoom.updateOne({ room_id }, { status: 'finished' });
+                const sorted = [...r.players].sort((a, b) => b.progress - a.progress);
+                io.to(room_id).emit('typing_game_over', { players: sorted, winner: sorted[0] });
+            }, duration);
+        }, 3000);
+    });
+
+    socket.on('typing_progress', async ({ room_id, charIndex, progress }) => {
+        await TypingRoom.updateOne(
+            { room_id, 'players.socketId': socket.id },
+            { $set: { 'players.$.progress': progress } }
+        );
+        // broadcast charIndex to opponent so they can show cursor position
+        socket.to(room_id).emit('typing_opponent_progress', { charIndex, progress });
+
+        // check if player finished
+        if (progress >= 100) {
+            const room = await TypingRoom.findOne({ room_id });
+            if (!room || room.status !== 'playing') return;
+            await TypingRoom.updateOne(
+                { room_id, 'players.socketId': socket.id },
+                { $set: { 'players.$.finished': true } }
+            );
+            await TypingRoom.updateOne({ room_id }, { status: 'finished' });
+            const updated = await TypingRoom.findOne({ room_id });
+            const sorted = [...updated.players].sort((a, b) => b.progress - a.progress);
+            io.to(room_id).emit('typing_game_over', { players: sorted, winner: sorted[0] });
+        }
+    });
+
+    socket.on('typing_leave', async ({ room_id }) => {
+        await TypingRoom.updateOne(
+            { room_id },
+            { $pull: { players: { socketId: socket.id } } }
+        );
+        socket.leave(room_id);
+        socket.to(room_id).emit('typing_opponent_left');
+    });
+
+    socket.on('typing_rematch', async ({ room_id }) => {
+        await TypingRoom.updateOne({ room_id }, {
+            status: 'waiting',
+            text: '',
+            'players.$[].progress': 0,
+            'players.$[].finished': false,
+        });
+        const updated = await TypingRoom.findOne({ room_id });
+        io.to(room_id).emit('typing_players', updated.players);
+        io.to(updated.players[0]?.socketId).emit('typing_creator', true);
+    });
+})
 
 module.exports = server;

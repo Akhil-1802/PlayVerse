@@ -17,7 +17,7 @@ const games = [
     emoji: "⌨️",
     accent: "from-cyan-500 to-blue-500",
     glow: "hover:shadow-cyan-500/40",
-    badge: "Solo / Versus",
+    badge: "1v1 Race",
     path: "/typing",
   },
 ];
