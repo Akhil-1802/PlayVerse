@@ -8,7 +8,9 @@ const Room = require('./models/room.model');
 const Message = require('./models/message.model');
 const TypingRoom = require('./models/typingRoom.model');
 const { pickRandom } = require('./utils/helperfunction');
-const { getTypingText } = require('./utils/typingTexts');
+const typingRoundRoomRouter = require('./routes/typingRoundRoom.route');
+const TypingRoundRoom = require('./models/typingRoundRoom.model');
+const { getTypingText, getRoundText, getRoundTimer } = require('./utils/typingTexts');
 
 
 
@@ -17,6 +19,7 @@ app.use(express.json());
 app.use(cors());
 app.use('/api/room', roomRouter);
 app.use('/api/typing', typingRoomRouter);
+app.use('/api/typing-rounds', typingRoundRoomRouter);
 
 const server = http.createServer(app);
 const io = new Server(server,{
@@ -461,6 +464,153 @@ io.on('connection',async(socket)=>{
         const updated = await TypingRoom.findOne({ room_id });
         io.to(room_id).emit('typing_players', updated.players);
         io.to(updated.players[0]?.socketId).emit('typing_creator', true);
+    });
+
+    // ─── Typing Round Game ────────────────────────────────────────
+
+    socket.on('tround_join', async ({ room_id, name }) => {
+        const room = await TypingRoundRoom.findOne({ room_id });
+        if (!room) return;
+        socket.join(room_id);
+
+        const exists = room.players.find(p => p.name === name);
+        if (exists) {
+            await TypingRoundRoom.updateOne(
+                { room_id, 'players.name': name },
+                { $set: { 'players.$.socketId': socket.id } }
+            );
+        } else {
+            if (room.players.length >= 6) { socket.emit('tround_error', { message: 'Room is full' }); return; }
+            await TypingRoundRoom.updateOne(
+                { room_id },
+                { $push: { players: { name, socketId: socket.id, currentRound: 0, finished: false } } }
+            );
+        }
+
+        const updated = await TypingRoundRoom.findOne({ room_id });
+        io.to(room_id).emit('tround_players', updated.players);
+        if (updated.players[0]?.socketId === socket.id)
+            socket.emit('tround_creator', true);
+    });
+
+    socket.on('tround_start', async ({ room_id }) => {
+        const room = await TypingRoundRoom.findOne({ room_id });
+        if (!room || room.players[0]?.socketId !== socket.id) return;
+        if (room.players.length < 2) { socket.emit('tround_error', { message: 'Need at least 2 players' }); return; }
+
+        await TypingRoundRoom.updateOne({ room_id }, { status: 'countdown' });
+
+        io.to(room_id).emit('tround_countdown', { count: 3 });
+        setTimeout(() => io.to(room_id).emit('tround_countdown', { count: 2 }), 1000);
+        setTimeout(() => io.to(room_id).emit('tround_countdown', { count: 1 }), 2000);
+        setTimeout(async () => {
+            await TypingRoundRoom.updateOne(
+                { room_id },
+                { $set: { status: 'playing', 'players.$[].currentRound': 1 } }
+            );
+            const updated = await TypingRoundRoom.findOne({ room_id });
+            const roundDuration = getRoundTimer(1) * 1000;
+            const endsAt = Date.now() + roundDuration;
+            // same text for all players in round 1
+            const sharedText = getRoundText(1);
+            for (const p of updated.players) {
+                io.to(p.socketId).emit('tround_new_round', { round: 1, text: sharedText, endsAt, duration: getRoundTimer(1) });
+            }
+            io.to(room_id).emit('tround_players', updated.players);
+        }, 3000);
+    });
+
+    // player completed their current round text
+    socket.on('tround_complete', async ({ room_id }) => {
+        const room = await TypingRoundRoom.findOne({ room_id });
+        if (!room || room.status !== 'playing') return;
+
+        const player = room.players.find(p => p.socketId === socket.id);
+        if (!player) return;
+
+        const nextRound = player.currentRound + 1;
+
+        if (nextRound > room.totalRounds) {
+            // this player finished all rounds
+            await TypingRoundRoom.updateOne(
+                { room_id, 'players.socketId': socket.id },
+                { $set: { 'players.$.finished': true, 'players.$.currentRound': player.currentRound } }
+            );
+            socket.emit('tround_you_finished');
+
+            // check if all players finished
+            const updated = await TypingRoundRoom.findOne({ room_id });
+            const allDone = updated.players.every(p => p.finished);
+            if (allDone) {
+                await TypingRoundRoom.updateOne({ room_id }, { status: 'finished' });
+                const sorted = [...updated.players].sort((a, b) => b.currentRound - a.currentRound);
+                io.to(room_id).emit('tround_game_over', { players: sorted, winner: sorted[0] });
+            }
+            return;
+        }
+
+        // advance player to next round with same shared text
+        const sharedText = getRoundText(nextRound);
+        await TypingRoundRoom.updateOne(
+            { room_id, 'players.socketId': socket.id },
+            { $set: { 'players.$.currentRound': nextRound } }
+        );
+
+        const updated = await TypingRoundRoom.findOne({ room_id });
+        io.to(room_id).emit('tround_players', updated.players);
+
+        const roundDuration = getRoundTimer(nextRound) * 1000;
+        const endsAt = Date.now() + roundDuration;
+        socket.emit('tround_new_round', { round: nextRound, text: sharedText, endsAt, duration: getRoundTimer(nextRound) });
+    });
+
+    // round timer expired for a player
+    socket.on('tround_timeout', async ({ room_id }) => {
+        const room = await TypingRoundRoom.findOne({ room_id });
+        if (!room || room.status !== 'playing') return;
+
+        const player = room.players.find(p => p.socketId === socket.id);
+        if (!player || player.finished) return;
+
+        // mark player as eliminated
+        await TypingRoundRoom.updateOne(
+            { room_id, 'players.socketId': socket.id },
+            { $set: { 'players.$.finished': true, 'players.$.eliminated': true } }
+        );
+
+        // tell this player they are eliminated
+        socket.emit('tround_eliminated');
+
+        const updated = await TypingRoundRoom.findOne({ room_id });
+        const allDone = updated.players.every(p => p.finished);
+        if (allDone) {
+            await TypingRoundRoom.updateOne({ room_id }, { status: 'finished' });
+            const sorted = [...updated.players].sort((a, b) => b.currentRound - a.currentRound);
+            io.to(room_id).emit('tround_game_over', { players: sorted, winner: sorted[0] });
+        } else {
+            // broadcast updated players so others see the eliminated badge
+            io.to(room_id).emit('tround_players', updated.players);
+        }
+    });
+
+    socket.on('tround_leave', async ({ room_id }) => {
+        await TypingRoundRoom.updateOne({ room_id }, { $pull: { players: { socketId: socket.id } } });
+        socket.leave(room_id);
+        socket.to(room_id).emit('tround_player_left', { socketId: socket.id });
+        const updated = await TypingRoundRoom.findOne({ room_id });
+        if (updated) io.to(room_id).emit('tround_players', updated.players);
+    });
+
+    socket.on('tround_rematch', async ({ room_id }) => {
+        await TypingRoundRoom.updateOne({ room_id }, {
+            status: 'waiting',
+            'players.$[].currentRound': 0,
+            'players.$[].finished': false,
+            'players.$[].eliminated': false,
+        });
+        const updated = await TypingRoundRoom.findOne({ room_id });
+        io.to(room_id).emit('tround_players', updated.players);
+        io.to(updated.players[0]?.socketId).emit('tround_creator', true);
     });
 })
 

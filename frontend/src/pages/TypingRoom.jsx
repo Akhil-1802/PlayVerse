@@ -188,19 +188,44 @@ export default function TypingRoom() {
           </div>
         )}
 
-        {/* Player legend */}
+        {/* Player legend + progress bars */}
         {(phase === "playing" || phase === "finished") && (
-          <div className="flex items-center gap-4 text-xs font-semibold">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-0.5 h-4 bg-cyan-400 rounded-full" />
-              <span className="text-cyan-400">{name} <span className="text-white/30">(you)</span></span>
-            </span>
-            {opponent && (
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-0.5 h-4 bg-purple-400 animate-pulse rounded-full" />
-                <span className="text-purple-400">{opponent.name}</span>
-              </span>
-            )}
+          <div className="flex flex-col gap-3">
+            {/* Me */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-0.5 h-4 bg-cyan-400 rounded-full" />
+                  <span className="text-cyan-400">{name} <span className="text-white/30">(you)</span></span>
+                </span>
+                <span className="text-white/40">{myProgress}%</span>
+              </div>
+              <div className="h-2 bg-white/5 border border-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-150"
+                  style={{ width: `${myProgress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Opponent */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-0.5 h-4 bg-purple-400 animate-pulse rounded-full" />
+                  <span className="text-purple-400">{opponent?.name || "Waiting..."}</span>
+                </span>
+                <span className="text-white/40">
+                  {text.length > 0 ? Math.min(100, Math.round((opponentCharIndex / text.length) * 100)) : 0}%
+                </span>
+              </div>
+              <div className="h-2 bg-white/5 border border-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-150"
+                  style={{ width: `${text.length > 0 ? Math.min(100, Math.round((opponentCharIndex / text.length) * 100)) : 0}%` }}
+                />
+              </div>
+            </div>
           </div>
         )}
 
