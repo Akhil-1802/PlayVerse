@@ -4,6 +4,8 @@ A multiplayer gaming platform built with React, Node.js, Socket.IO and MongoDB.
 
 🌐 **Live:** [playverse10.netlify.app](https://playverse10.netlify.app)
 
+PlayVerse is an interactive online gaming hub where players can engage in real-time multiplayer games including drawing challenges and typing races. Whether you're sketching with friends or competing in fast-paced typing battles, PlayVerse offers a fun and competitive environment for all skill levels.
+
 ---
 
 ## Games
@@ -62,27 +64,34 @@ A multiplayer gaming platform built with React, Node.js, Socket.IO and MongoDB.
 
 ### Prerequisites
 - Node.js 20+
+- MongoDB Atlas account (for database)
 
 ---
 
 ### Run Locally
 
-**Backend**
-```bash
-cd backend
-npm install
-npm run dev
-```
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd PlayVerse
+   ```
 
-**Frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-```
+2. **Backend Setup**
+   ```bash
+   cd backend
+   npm install
+   npm run dev
+   ```
 
-Frontend → http://localhost:5173  
-Backend → http://localhost:3000
+3. **Frontend Setup**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+   - Frontend → http://localhost:5173
+   - Backend → http://localhost:3000
 
 ---
 
@@ -94,6 +103,8 @@ Create `backend/.env`:
 MONGODB_URI=your_mongodb_connection_string
 ```
 
+Replace `your_mongodb_connection_string` with your actual MongoDB Atlas connection string.
+
 ---
 
 ## Project Structure
@@ -101,20 +112,68 @@ MONGODB_URI=your_mongodb_connection_string
 ```
 PlayVerse/
 ├── backend/
-│   ├── src/
-│   │   ├── controllers/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   └── utils/
-│   └── server.js
-└── frontend/
-    └── src/
-        ├── components/
-        ├── hooks/
-        ├── pages/
-        ├── services/
-        └── utils/
+│   ├── package.json
+│   ├── server.js
+│   └── src/
+│       ├── app.js
+│       ├── controllers/
+│       │   ├── room.controller.js
+│       │   ├── typingRoom.controller.js
+│       │   └── typingRoundRoom.controller.js
+│       ├── models/
+│       │   ├── message.model.js
+│       │   ├── room.model.js
+│       │   ├── typingRoom.model.js
+│       │   └── typingRoundRoom.model.js
+│       ├── routes/
+│       │   ├── room.route.js
+│       │   ├── typingRoom.route.js
+│       │   └── typingRoundRoom.route.js
+│       └── utils/
+│           ├── db.js
+│           ├── helperfunction.js
+│           ├── typingTexts.js
+│           └── words.js
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── index.html
+│   └── src/
+│       ├── App.jsx
+│       ├── main.jsx
+│       ├── index.css
+│       ├── api/
+│       │   └── client.js
+│       ├── components/
+│       │   └── Canvas.jsx
+│       ├── hooks/
+│       │   └── userRoom.js
+│       ├── pages/
+│       │   ├── Home.jsx
+│       │   ├── Room.jsx
+│       │   ├── Scribble.jsx
+│       │   ├── Typing.jsx
+│       │   ├── TypingRoom.jsx
+│       │   └── TypingRoundRoom.jsx
+│       ├── services/
+│       │   └── userServices.js
+│       └── utils/
+│           └── socket.js
+├── LICENSE
+└── readme.md
 ```
+
+---
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
