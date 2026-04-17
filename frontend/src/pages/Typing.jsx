@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API = "https://playverse-bg0l.onrender.com" || "http://localhost:3000";
 
 const MODES = [
   {
